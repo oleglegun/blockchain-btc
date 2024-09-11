@@ -111,7 +111,7 @@ type Address struct {
 }
 
 func (a Address) String() string {
-	return hex.EncodeToString(a.value)[0:20]
+	return hex.EncodeToString(a.value)
 }
 
 func (a Address) Bytes() []byte {

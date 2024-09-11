@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option go_package = "github.com/oleglegun/blockchain-gg/genproto";
+
+message Block {
+    Header header = 1;
+    repeated Transaction transactions = 2;
+}
+
+message Header {
+    int32 version = 1;
+    int32 height = 2; // a sequential id, for 10 blocks - 10
+    bytes prevHash = 3;
+    bytes rootHash = 4; // merkle tree root of transactions
+    int64 timestamp = 5;
+}
+
+message Transaction {
+
+}
