@@ -1,4 +1,6 @@
-/bin
-.DS_Store
-
 .env
+
+/bin
+
+cspell.config.yaml
+.DS_Store

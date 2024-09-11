@@ -1,4 +1,4 @@
-package crypto
+package cryptography
 
 import (
 	"crypto/ed25519"
@@ -43,6 +43,7 @@ func GeneratePrivateKeyFromString(str string) PrivateKey {
 /*-----------------------------------------------------------------------------
  *  PrivateKey
  *----------------------------------------------------------------------------*/
+
 type PrivateKey struct {
 	key ed25519.PrivateKey
 }
