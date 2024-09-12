@@ -3,8 +3,8 @@ package types
 import (
 	"testing"
 
-	"github.com/oleglegun/blockchain-gg/internal/cryptography"
-	"github.com/oleglegun/blockchain-gg/internal/random"
+	"github.com/oleglegun/blockchain-btc/internal/cryptography"
+	"github.com/oleglegun/blockchain-btc/internal/random"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +21,7 @@ func TestSignBlock(t *testing.T) {
 		pubKey  = privKey.Public()
 	)
 
-	sig := SignBlock(privKey, block)
+	sig := CalculateBlockSignature(privKey, block)
 
 	assert.Equal(t, 64, len(sig.Bytes()))
 	assert.True(t, sig.Verify(pubKey, CalculateBlockHash(block)))

@@ -3,8 +3,8 @@ package types
 import (
 	"crypto/sha256"
 
-	"github.com/oleglegun/blockchain-gg/internal/cryptography"
-	"github.com/oleglegun/blockchain-gg/internal/genproto"
+	"github.com/oleglegun/blockchain-btc/internal/cryptography"
+	"github.com/oleglegun/blockchain-btc/internal/genproto"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -19,7 +19,7 @@ func CalculateBlockHash(block *genproto.Block) []byte {
 	return hash[:]
 }
 
-// SignBlock signs the given block using the provided private key.
-func SignBlock(privKey cryptography.PrivateKey, block *genproto.Block) cryptography.Signature {
+// CalculateBlockSignature signs the given block using the provided private key.
+func CalculateBlockSignature(privKey cryptography.PrivateKey, block *genproto.Block) cryptography.Signature {
 	return privKey.Sign(CalculateBlockHash(block))
 }

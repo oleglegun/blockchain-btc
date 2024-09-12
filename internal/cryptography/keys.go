@@ -13,6 +13,7 @@ const (
 	pubKeyLen  = 32
 	seedLen    = 32
 	addressLen = 20
+	sigLen     = 64
 )
 
 func GeneratePrivateKey() PrivateKey {
@@ -26,7 +27,7 @@ func GeneratePrivateKey() PrivateKey {
 
 func GeneratePrivateKeyFromSeed(seed []byte) PrivateKey {
 	if len(seed) != seedLen {
-		log.Fatalf("Seed length should be %d bytes", seedLen)
+		log.Fatalf("seed length should be %d bytes", seedLen)
 	}
 
 	return PrivateKey{key: ed25519.NewKeyFromSeed(seed)}
@@ -75,6 +76,15 @@ type PublicKey struct {
 	key ed25519.PublicKey
 }
 
+func NewPublicKeyFromBytes(b []byte) PublicKey {
+	if len(b) != pubKeyLen {
+		log.Fatal("invalid public key length")
+	}
+	return PublicKey{
+		key: ed25519.PublicKey(b),
+	}
+}
+
 func (p PublicKey) Bytes() []byte {
 	return p.key
 }
@@ -93,6 +103,15 @@ func (p PublicKey) Address() Address {
 // Change to pointer if needed (for len and cap)
 type Signature struct {
 	value []byte
+}
+
+func NewSignatureFromBytes(b []byte) Signature {
+	if len(b) != sigLen {
+		log.Fatal("signature length is incorrect")
+	}
+	return Signature{
+		value: b,
+	}
 }
 
 func (s Signature) Bytes() []byte {
