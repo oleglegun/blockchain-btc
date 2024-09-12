@@ -1,5 +1,5 @@
 build:
-	@go build -o bin/blockchain
+	@go build -o bin/blockchain ./cmd/node/main.go
 
 run: build
 	@./bin/blockchain
