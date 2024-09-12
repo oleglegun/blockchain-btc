@@ -1,4 +1,4 @@
-module github.com/oleglegun/blockchain-gg
+module github.com/oleglegun/blockchain-btc
 
 go 1.23.0
 
