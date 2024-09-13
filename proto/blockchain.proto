@@ -12,6 +12,8 @@ service Node {
 message NodeInfo {
     string version = 1;
     int32 height = 2;
+    // listenAddr is an address the node is listening on for connections.
+    string listenAddr = 3;
 }
 
 message Block {
