@@ -27,24 +27,38 @@ type Node struct {
 	log        *slog.Logger
 
 	mu    sync.RWMutex
-	peers map[genproto.NodeClient]*genproto.NodeInfo
+	peers map[string]ConnectedPeer
+}
+
+type ConnectedPeer struct {
+	peerClient genproto.NodeClient
+	nodeInfo   *genproto.NodeInfo
 }
 
 func NewNode(listenAddr string) *Node {
 	logHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
+		Level:     slog.LevelDebug,
 		AddSource: false,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				return slog.Attr{}
+			}
+			return a
+		},
 	})
 
 	return &Node{
-		peers:      make(map[genproto.NodeClient]*genproto.NodeInfo),
+		peers:      make(map[string]ConnectedPeer),
 		version:    nodeVersion,
 		listenAddr: listenAddr,
 		log:        slog.New(logHandler).With("node", listenAddr),
 	}
 }
 
-func (n *Node) Start() error {
+// Start runs the node server, listening on the configured listen address and
+// registering the node gRPC service. It bootstraps the node by connecting to
+// the specified list of bootstrap nodes.
+func (n *Node) Start(bootstrapNodes []string) error {
 	grpcServer := grpc.NewServer()
 	tpcListener, err := net.Listen("tcp", n.listenAddr)
 	if err != nil {
@@ -54,21 +68,22 @@ func (n *Node) Start() error {
 	genproto.RegisterNodeServer(grpcServer, n)
 
 	n.log.Debug("running...")
+
+	if len(bootstrapNodes) > 0 {
+		n.log.Debug("need connect to", "peers", bootstrapNodes)
+		n.bootstrapNetwork(bootstrapNodes)
+	}
+
 	return grpcServer.Serve(tpcListener)
 }
 
 // bootstrapNetwork connects the current node to the specified list of listen socket addresses (ip:port).
 // It creates a new client connection to each peer node and performs a handshake to exchange node information.
-func (n *Node) BootstrapNetwork(listenSocketAddrs []string) error {
+func (n *Node) bootstrapNetwork(listenSocketAddrs []string) error {
 	for _, listenSocketAddr := range listenSocketAddrs {
-		peerClient, err := newNodeClient(listenSocketAddr)
+		peerClient, peerNodeInfo, err := n.dialPeerNode(listenSocketAddr)
 		if err != nil {
-			return err
-		}
-
-		peerNodeInfo, err := peerClient.Handshake(context.TODO(), n.getNodeInfo())
-		if err != nil {
-			n.log.Debug("handshake error", "error", err)
+			n.log.Error("cannot dial to peer node", "error", err)
 			continue
 		}
 
@@ -122,25 +137,91 @@ func (n *Node) HandleTransaction(ctx context.Context, tx *genproto.Transaction) 
 
 func (n *Node) addPeer(peerClient genproto.NodeClient, peerNodeInfo *genproto.NodeInfo) {
 	n.mu.Lock()
-	defer n.mu.Unlock()
+	n.peers[peerNodeInfo.ListenAddr] = ConnectedPeer{
+		peerClient: peerClient,
+		nodeInfo:   peerNodeInfo,
+	}
+	n.mu.Unlock()
 
-	n.log.Debug("new peer connected", "peer", peerNodeInfo.ListenAddr, "height", peerNodeInfo.Height)
-	n.peers[peerClient] = peerNodeInfo
+	n.log.Debug("new peer connected", "peer", peerNodeInfo.ListenAddr)
+
+	absentPeerList := n.getAbsentPeerList(peerNodeInfo.PeerList)
+
+	if len(absentPeerList) > 0 {
+		n.log.Debug("need connect to", "peers", absentPeerList)
+		go n.bootstrapNetwork(absentPeerList)
+	}
 }
 
-func (n *Node) removePeer(c genproto.NodeClient) {
+func (n *Node) removePeer(peerListenAddr string) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	delete(n.peers, c)
+	// TODO: close the peerClient
+	delete(n.peers, peerListenAddr)
+}
+
+func (n *Node) getAbsentPeerList(peerAddrList []string) []string {
+	absentPeerAddresses := []string{}
+
+	connectedPeers := n.getPeerList()
+
+	for _, peerAddr := range peerAddrList {
+		if peerAddr == n.listenAddr {
+			// Skip own address
+			continue
+		}
+
+		isConnected := false
+		for _, connectedPeer := range connectedPeers {
+			if peerAddr == connectedPeer {
+				isConnected = true
+				break
+			}
+		}
+
+		if !isConnected {
+			absentPeerAddresses = append(absentPeerAddresses, peerAddr)
+		}
+	}
+
+	return absentPeerAddresses
 }
 
 func (n *Node) getNodeInfo() *genproto.NodeInfo {
 	return &genproto.NodeInfo{
 		Version:    n.version,
-		Height:     10,
+		Height:     0,
 		ListenAddr: n.listenAddr,
+		PeerList:   n.getPeerList(),
 	}
+}
+
+func (n *Node) dialPeerNode(peerListenAddr string) (genproto.NodeClient, *genproto.NodeInfo, error) {
+	peerClient, err := newNodeClient(peerListenAddr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	peerNodeInfo, err := peerClient.Handshake(context.TODO(), n.getNodeInfo())
+	if err != nil {
+		n.log.Debug("handshake error", "error", err)
+		return nil, nil, err
+	}
+
+	return peerClient, peerNodeInfo, nil
+}
+
+func (n *Node) getPeerList() []string {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	peerList := make([]string, 0, len(n.peers))
+	for k := range n.peers {
+		peerList = append(peerList, k)
+	}
+
+	return peerList
 }
 
 func newNodeClient(listenSocketAddr string) (genproto.NodeClient, error) {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/oleglegun/blockchain-btc/internal/genproto"
 	"github.com/oleglegun/blockchain-btc/internal/node"
@@ -11,9 +12,15 @@ import (
 )
 
 func main() {
-	makeNode(":3000", []string{})
-	makeNode(":3001", []string{"localhost:3000"})
-	makeNode(":3002", []string{"localhost:3000", "localhost:3001"})
+	makeNode(":3001", []string{})
+	time.Sleep(time.Second)
+	makeNode(":3002", []string{})
+	time.Sleep(time.Second)
+	makeNode(":3003", []string{"localhost:3001"})
+	time.Sleep(time.Second)
+	makeNode(":3004", []string{"localhost:3001", "localhost:3002"})
+
+	time.Sleep(10 * time.Second)
 }
 
 /*-----------------------------------------------------------------------------
@@ -23,9 +30,10 @@ func main() {
 func makeNode(listenAddr string, bootstrapNodes []string) error {
 	nodeServer := node.NewNode(listenAddr)
 	go func() {
-		log.Fatal(nodeServer.Start())
+		log.Fatal(nodeServer.Start(bootstrapNodes))
 	}()
-	return nodeServer.BootstrapNetwork(bootstrapNodes)
+
+	return nil
 }
 
 func makeTransaction(addr string) {

@@ -14,6 +14,7 @@ message NodeInfo {
     int32 height = 2;
     // listenAddr is an address the node is listening on for connections.
     string listenAddr = 3;
+    repeated string peerList = 4;
 }
 
 message Block {
