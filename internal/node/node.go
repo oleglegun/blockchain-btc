@@ -3,7 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"sync"
@@ -24,18 +24,23 @@ type Node struct {
 
 	version    string
 	listenAddr string
-	log        *log.Logger
+	log        *slog.Logger
 
 	mu    sync.RWMutex
 	peers map[genproto.NodeClient]*genproto.NodeInfo
 }
 
 func NewNode(listenAddr string) *Node {
+	logHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+		AddSource: false,
+	})
+
 	return &Node{
 		peers:      make(map[genproto.NodeClient]*genproto.NodeInfo),
 		version:    nodeVersion,
 		listenAddr: listenAddr,
-		log:        log.New(os.Stderr, fmt.Sprintf("[ NODE %s ] ", listenAddr), log.LstdFlags|log.Lmsgprefix),
+		log:        slog.New(logHandler).With("node", listenAddr),
 	}
 }
 
@@ -48,7 +53,7 @@ func (n *Node) Start() error {
 
 	genproto.RegisterNodeServer(grpcServer, n)
 
-	n.log.Println("running...")
+	n.log.Debug("running...")
 	return grpcServer.Serve(tpcListener)
 }
 
@@ -63,7 +68,7 @@ func (n *Node) BootstrapNetwork(listenSocketAddrs []string) error {
 
 		peerNodeInfo, err := peerClient.Handshake(context.TODO(), n.getNodeInfo())
 		if err != nil {
-			n.log.Println("handshake error:", err)
+			n.log.Debug("handshake error", "error", err)
 			continue
 		}
 
@@ -85,7 +90,7 @@ func (n *Node) Handshake(ctx context.Context, peerNodeInfo *genproto.NodeInfo) (
 	thisNodeInfo := n.getNodeInfo()
 
 	if thisNodeInfo.Version != peerNodeInfo.Version {
-		n.log.Println("incompatible node versions")
+		n.log.Debug("incompatible node versions")
 		return nil, fmt.Errorf("incompatible node versions")
 	}
 
@@ -102,9 +107,10 @@ func (n *Node) Handshake(ctx context.Context, peerNodeInfo *genproto.NodeInfo) (
 func (n *Node) HandleTransaction(ctx context.Context, tx *genproto.Transaction) (*emptypb.Empty, error) {
 	peer, ok := peer.FromContext(ctx)
 	if !ok {
-		n.log.Fatal("cannot get peer from the context")
+		n.log.Error("cannot get peer from the context")
+
 	}
-	n.log.Println("received tx from:", peer.Addr)
+	n.log.Debug("received tx", "from", peer.Addr)
 	_ = peer
 
 	return &emptypb.Empty{}, nil
@@ -118,7 +124,7 @@ func (n *Node) addPeer(peerClient genproto.NodeClient, peerNodeInfo *genproto.No
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	n.log.Printf("new peer connected: %s, height: %d", peerNodeInfo.ListenAddr, peerNodeInfo.Height)
+	n.log.Debug("new peer connected", "peer", peerNodeInfo.ListenAddr, "height", peerNodeInfo.Height)
 	n.peers[peerClient] = peerNodeInfo
 }
 
