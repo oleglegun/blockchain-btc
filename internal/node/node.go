@@ -26,8 +26,8 @@ type Node struct {
 	listenAddr string
 	log        *slog.Logger
 
-	mu    sync.RWMutex
-	peers map[string]ConnectedPeer
+	peersLock sync.RWMutex
+	peers     map[string]ConnectedPeer
 }
 
 type ConnectedPeer struct {
@@ -136,12 +136,14 @@ func (n *Node) HandleTransaction(ctx context.Context, tx *genproto.Transaction) 
 //-----------------------------------------------------------------------------
 
 func (n *Node) addPeer(peerClient genproto.NodeClient, peerNodeInfo *genproto.NodeInfo) {
-	n.mu.Lock()
+	n.peersLock.Lock()
 	n.peers[peerNodeInfo.ListenAddr] = ConnectedPeer{
 		peerClient: peerClient,
 		nodeInfo:   peerNodeInfo,
 	}
-	n.mu.Unlock()
+	n.log.Debug("connected nodes", "count", len(n.peers))
+
+	n.peersLock.Unlock()
 
 	n.log.Debug("new peer connected", "peer", peerNodeInfo.ListenAddr)
 
@@ -154,8 +156,8 @@ func (n *Node) addPeer(peerClient genproto.NodeClient, peerNodeInfo *genproto.No
 }
 
 func (n *Node) removePeer(peerListenAddr string) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+	n.peersLock.Lock()
+	defer n.peersLock.Unlock()
 
 	// TODO: close the peerClient
 	delete(n.peers, peerListenAddr)
@@ -213,8 +215,8 @@ func (n *Node) dialPeerNode(peerListenAddr string) (genproto.NodeClient, *genpro
 }
 
 func (n *Node) getPeerList() []string {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
+	n.peersLock.RLock()
+	defer n.peersLock.RUnlock()
 
 	peerList := make([]string, 0, len(n.peers))
 	for k := range n.peers {

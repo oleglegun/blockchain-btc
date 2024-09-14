@@ -9,8 +9,8 @@ import (
 )
 
 // CalculateBlockHash computes the hash of the given block's header.
-func CalculateBlockHash(block *genproto.Block) []byte {
-	b, err := proto.Marshal(block.Header)
+func CalcBlockHeaderHash(header *genproto.BlockHeader) []byte {
+	b, err := proto.Marshal(header)
 	if err != nil {
 		panic(err)
 	}
@@ -19,7 +19,13 @@ func CalculateBlockHash(block *genproto.Block) []byte {
 	return hash[:]
 }
 
-// CalculateBlockSignature signs the given block using the provided private key.
-func CalculateBlockSignature(privKey cryptography.PrivateKey, block *genproto.Block) cryptography.Signature {
-	return privKey.Sign(CalculateBlockHash(block))
+// CalcBlockHash computes the hash of the given block's header.
+// Block hash == its header hash
+func CalcBlockHash(block *genproto.Block) []byte {
+	return CalcBlockHeaderHash(block.Header)
+}
+
+// CalcBlockSignature signs the given block using the provided private key.
+func CalcBlockSignature(privKey cryptography.PrivateKey, block *genproto.Block) cryptography.Signature {
+	return privKey.Sign(CalcBlockHash(block))
 }

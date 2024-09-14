@@ -24,7 +24,7 @@ func TestPrivateKeySign(t *testing.T) {
 
 	msg := []byte("message")
 	differentMsg := []byte("different message")
-	emptyMsg := []byte{}
+	emptyMsg := make([]byte, 0)
 
 	t.Run("Valid message verification", func(t *testing.T) {
 		sig := privKey.Sign(msg)

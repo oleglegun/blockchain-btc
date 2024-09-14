@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -11,14 +12,20 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+const nodeCount = 4
+
 func main() {
-	makeNode(":3001", []string{})
-	time.Sleep(time.Second)
-	makeNode(":3002", []string{})
-	time.Sleep(time.Second)
-	makeNode(":3003", []string{"localhost:3001"})
-	time.Sleep(time.Second)
-	makeNode(":3004", []string{"localhost:3001", "localhost:3002"})
+	for i := 0; i < nodeCount; i++ {
+		port := 3000 + i
+		listenAddr := fmt.Sprintf(":%d", port)
+		bootstrapNodes := make([]string, 0, nodeCount)
+		if i > 0 {
+			bootstrapNodes = append(bootstrapNodes, fmt.Sprintf("localhost:%d", port-1))
+		}
+
+		makeNode(listenAddr, bootstrapNodes)
+		time.Sleep(time.Second)
+	}
 
 	time.Sleep(10 * time.Second)
 }
