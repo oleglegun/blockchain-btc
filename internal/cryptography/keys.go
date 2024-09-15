@@ -91,7 +91,8 @@ func (p PublicKey) Bytes() []byte {
 
 func (p PublicKey) Address() Address {
 	return Address{
-		// Return the last 20 bytes of the public key
+		// Return the last 20 bytes of the public key.
+		// Similar to how Ethereum addresses are derived from the last 20 bytes of the Keccak-256 hash of the public key.
 		value: p.key[len(p.key)-addressLen:],
 	}
 }

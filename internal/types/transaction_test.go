@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/oleglegun/blockchain-btc/internal/cryptography"
@@ -56,7 +55,5 @@ func TestCalculateTransactionHash(t *testing.T) {
 	txIn1.Signature = sig1.Bytes()
 	txIn2.Signature = sig2.Bytes()
 
-	fmt.Println(tx)
 	assert.True(t, VerifyTransaction(tx))
-
 }

@@ -27,17 +27,25 @@ func (c *Chain) AddBlock(b *genproto.Block) error {
 
 func (c *Chain) GetBlockByHash(hash []byte) (*genproto.Block, error) {
 	hashString := hex.EncodeToString(hash)
-	return c.blockStore.Get(hashString)
+	block, err := c.blockStore.Get(hashString)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block by hash %s: %w", hashString, err)
+	}
+	return block, nil
 }
 
 func (c *Chain) GetBlockByHeight(height int) (*genproto.Block, error) {
 	if height > c.Height() {
-		return nil, fmt.Errorf("block with height %d doesn't exist", height)
+		return nil, fmt.Errorf("block with height %d doesn't exist", height,)
 	}
 
 	blockHeader := c.blockHeaders.Get(height)
 	hash := types.CalcBlockHeaderHash(blockHeader)
-	return c.GetBlockByHash(hash)
+	block, err := c.GetBlockByHash(hash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block at height %d: %w", height, err)
+	}
+	return block, nil
 }
 
 func (c *Chain) Height() int {
@@ -68,9 +76,5 @@ func (hs *BlockHeaderList) Get(height int) *genproto.BlockHeader {
 
 func (hs *BlockHeaderList) Height() int {
 	// blockchain always has a genesis block
-	return len(hs.headerList) - 1
-}
-
-func (hs *BlockHeaderList) Length() int {
 	return len(hs.headerList) - 1
 }

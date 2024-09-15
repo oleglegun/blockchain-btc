@@ -2,13 +2,16 @@ package node
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/oleglegun/blockchain-btc/internal/genproto"
+	"github.com/oleglegun/blockchain-btc/internal/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/peer"
@@ -19,6 +22,32 @@ const (
 	nodeVersion = "1.0"
 )
 
+type Mempool struct {
+	txx map[string]*genproto.Transaction
+}
+
+func NewMempool() *Mempool {
+	return &Mempool{
+		txx: make(map[string]*genproto.Transaction),
+	}
+}
+
+func (p *Mempool) Has(tx *genproto.Transaction) bool {
+	hash := hex.EncodeToString(types.CalculateTransactionHash(tx))
+	_, ok := p.txx[hash]
+	return ok
+}
+
+func (p *Mempool) Add(tx *genproto.Transaction) bool {
+	if p.Has(tx) {
+		return false
+	}
+
+	hash := hex.EncodeToString(types.CalculateTransactionHash(tx))
+	p.txx[hash] = tx
+	return true
+}
+
 type Node struct {
 	genproto.UnimplementedNodeServer
 
@@ -28,6 +57,7 @@ type Node struct {
 
 	peersLock sync.RWMutex
 	peers     map[string]ConnectedPeer
+	mempool   *Mempool
 }
 
 type ConnectedPeer struct {
@@ -52,6 +82,7 @@ func NewNode(listenAddr string) *Node {
 		version:    nodeVersion,
 		listenAddr: listenAddr,
 		log:        slog.New(logHandler).With("node", listenAddr),
+		mempool:    NewMempool(),
 	}
 }
 
@@ -125,8 +156,17 @@ func (n *Node) HandleTransaction(ctx context.Context, tx *genproto.Transaction) 
 		n.log.Error("cannot get peer from the context")
 
 	}
-	n.log.Debug("received tx", "from", peer.Addr)
-	_ = peer
+
+	if n.mempool.Add(tx) {
+		txHash := hex.EncodeToString(types.CalculateTransactionHash(tx))
+		n.log.Debug("received tx", "from", peer.Addr, "tx", txHash)
+
+		go func() {
+			if err := n.broadcast(tx); err != nil {
+				n.log.Error("failed to broadcast transaction", "error", err)
+			}
+		}()
+	}
 
 	return &emptypb.Empty{}, nil
 }
@@ -161,6 +201,36 @@ func (n *Node) removePeer(peerListenAddr string) {
 
 	// TODO: close the peerClient
 	delete(n.peers, peerListenAddr)
+}
+
+// broadcast broadcasts message to all known peers
+func (n *Node) broadcast(msg any) error {
+	n.peersLock.RLock()
+	defer n.peersLock.RUnlock()
+
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	switch v := msg.(type) {
+	case *genproto.Transaction:
+		for _, peer := range n.peers {
+			wg.Add(1)
+			go func(peer ConnectedPeer) {
+				defer wg.Done()
+				_, err := peer.peerClient.HandleTransaction(ctx, v)
+				if err != nil {
+					n.log.Error("failed to broadcast transaction to peer", "peer", peer.nodeInfo.ListenAddr, "error", err)
+				}
+			}(peer)
+		}
+	default:
+		n.log.Error("unsupported message type for broadcast", "type", fmt.Sprintf("%T", msg))
+		return fmt.Errorf("unsupported message type: %T", msg)
+	}
+
+	wg.Wait()
+	return nil
 }
 
 func (n *Node) getAbsentPeerList(peerAddrList []string) []string {
