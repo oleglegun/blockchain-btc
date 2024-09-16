@@ -26,7 +26,7 @@ func NewMemoryBlockStore() *MemoryBlockStore {
 }
 
 func (s *MemoryBlockStore) Put(block *genproto.Block) error {
-	hash := hex.EncodeToString(types.CalcBlockHash(block))
+	hash := hex.EncodeToString(types.HashBlock(block))
 	s.Lock()
 	defer s.Unlock()
 	s.blocks[hash] = block

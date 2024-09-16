@@ -9,7 +9,7 @@ import (
 )
 
 // CalculateBlockHash computes the hash of the given block's header.
-func CalcBlockHeaderHash(header *genproto.BlockHeader) []byte {
+func HashBlockHeader(header *genproto.BlockHeader) []byte {
 	b, err := proto.Marshal(header)
 	if err != nil {
 		panic(err)
@@ -19,13 +19,32 @@ func CalcBlockHeaderHash(header *genproto.BlockHeader) []byte {
 	return hash[:]
 }
 
-// CalcBlockHash computes the hash of the given block's header.
+// HashBlock computes the hash of the given block's header.
 // Block hash == its header hash
-func CalcBlockHash(block *genproto.Block) []byte {
-	return CalcBlockHeaderHash(block.Header)
+func HashBlock(block *genproto.Block) []byte {
+	return HashBlockHeader(block.Header)
 }
 
-// CalcBlockSignature signs the given block using the provided private key.
-func CalcBlockSignature(privKey cryptography.PrivateKey, block *genproto.Block) cryptography.Signature {
-	return privKey.Sign(CalcBlockHash(block))
+// SignBlock signs the given block using the provided private key.
+func SignBlock(privKey cryptography.PrivateKey, block *genproto.Block) cryptography.Signature {
+	hash := HashBlock(block)
+	signature := privKey.Sign(hash)
+	block.PublicKey = privKey.Public().Bytes()
+	block.Signature = signature.Bytes()
+	return privKey.Sign(HashBlock(block))
+}
+
+func VerifyBlock(block *genproto.Block) bool {
+	if len(block.PublicKey) != cryptography.PubKeyLen {
+		return false
+	}
+	if len(block.Signature) != cryptography.SigLen {
+		return false
+	}
+
+	hash := HashBlock(block)
+	pubKey := cryptography.NewPublicKeyFromBytes(block.PublicKey)
+	signature := cryptography.NewSignatureFromBytes(block.Signature)
+
+	return signature.Verify(pubKey, hash)
 }

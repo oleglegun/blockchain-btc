@@ -19,7 +19,9 @@ message NodeInfo {
 
 message Block {
     BlockHeader header = 1;
-    repeated Transaction transactions = 2;
+    bytes publicKey = 2;
+    bytes signature = 3;
+    repeated Transaction transactions = 4;
 }
 
 message BlockHeader {

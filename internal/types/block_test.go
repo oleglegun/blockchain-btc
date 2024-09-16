@@ -10,7 +10,7 @@ import (
 
 func TestCalculateBlockHash(t *testing.T) {
 	block := random.RandomBlock()
-	hash := CalcBlockHash(block)
+	hash := HashBlock(block)
 	assert.Equal(t, 32, len(hash))
 }
 
@@ -21,8 +21,19 @@ func TestSignBlock(t *testing.T) {
 		pubKey  = privKey.Public()
 	)
 
-	sig := CalcBlockSignature(privKey, block)
+	sig := SignBlock(privKey, block)
 
 	assert.Equal(t, 64, len(sig.Bytes()))
-	assert.True(t, sig.Verify(pubKey, CalcBlockHash(block)))
+	assert.True(t, sig.Verify(pubKey, HashBlock(block)))
+
+	assert.Equal(t, pubKey.Bytes(), block.PublicKey)
+	assert.Equal(t, sig.Bytes(), block.Signature)
+
+	assert.True(t, VerifyBlock(block))
+
+	invalidPrivKey := cryptography.GeneratePrivateKey()
+	block.PublicKey = invalidPrivKey.Public().Bytes()
+
+	assert.False(t, VerifyBlock(block))
+
 }

@@ -14,6 +14,12 @@ func Random32ByteHash() []byte {
 	return hash
 }
 
+func Random64ByteHash() []byte {
+	hash := make([]byte, 64)
+	rand.Read(hash)
+	return hash
+}
+
 func RandomBlock() *genproto.Block {
 	blockHeader := &genproto.BlockHeader{
 		Version:   1,
@@ -25,6 +31,8 @@ func RandomBlock() *genproto.Block {
 
 	return &genproto.Block{
 		Header: blockHeader,
+		PublicKey: Random32ByteHash(),
+		Signature: Random64ByteHash(),
 	}
 
 }

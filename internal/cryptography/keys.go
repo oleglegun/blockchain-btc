@@ -9,15 +9,15 @@ import (
 )
 
 const (
-	privKeyLen = 64
-	pubKeyLen  = 32
-	seedLen    = 32
-	addressLen = 20
-	sigLen     = 64
+	PrivKeyLen = 64
+	PubKeyLen  = 32
+	SeedLen    = 32
+	AddressLen = 20
+	SigLen     = 64
 )
 
 func GeneratePrivateKey() PrivateKey {
-	seed := make([]byte, seedLen)
+	seed := make([]byte, SeedLen)
 	_, err := io.ReadFull(rand.Reader, seed)
 	if err != nil {
 		log.Fatal(err)
@@ -26,8 +26,8 @@ func GeneratePrivateKey() PrivateKey {
 }
 
 func GeneratePrivateKeyFromSeed(seed []byte) PrivateKey {
-	if len(seed) != seedLen {
-		log.Fatalf("seed length should be %d bytes", seedLen)
+	if len(seed) != SeedLen {
+		log.Fatalf("seed length should be %d bytes", SeedLen)
 	}
 
 	return PrivateKey{key: ed25519.NewKeyFromSeed(seed)}
@@ -60,7 +60,7 @@ func (p PrivateKey) Sign(msg []byte) Signature {
 }
 
 func (p PrivateKey) Public() PublicKey {
-	b := make([]byte, pubKeyLen)
+	b := make([]byte, PubKeyLen)
 	copy(b, p.Bytes()[32:])
 
 	return PublicKey{
@@ -77,7 +77,7 @@ type PublicKey struct {
 }
 
 func NewPublicKeyFromBytes(b []byte) PublicKey {
-	if len(b) != pubKeyLen {
+	if len(b) != PubKeyLen {
 		log.Fatal("invalid public key length")
 	}
 	return PublicKey{
@@ -93,7 +93,7 @@ func (p PublicKey) Address() Address {
 	return Address{
 		// Return the last 20 bytes of the public key.
 		// Similar to how Ethereum addresses are derived from the last 20 bytes of the Keccak-256 hash of the public key.
-		value: p.key[len(p.key)-addressLen:],
+		value: p.key[len(p.key)-AddressLen:],
 	}
 }
 
@@ -107,7 +107,7 @@ type Signature struct {
 }
 
 func NewSignatureFromBytes(b []byte) Signature {
-	if len(b) != sigLen {
+	if len(b) != SigLen {
 		log.Fatal("signature length is incorrect")
 	}
 	return Signature{
