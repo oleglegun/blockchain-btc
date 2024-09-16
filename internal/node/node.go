@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/oleglegun/blockchain-btc/internal/cryptography"
 	"github.com/oleglegun/blockchain-btc/internal/genproto"
 	"github.com/oleglegun/blockchain-btc/internal/types"
 	"google.golang.org/grpc"
@@ -20,40 +21,20 @@ import (
 
 const (
 	nodeVersion = "1.0"
+	blockTime   = time.Second * 5
 )
 
-type Mempool struct {
-	txx map[string]*genproto.Transaction
-}
-
-func NewMempool() *Mempool {
-	return &Mempool{
-		txx: make(map[string]*genproto.Transaction),
-	}
-}
-
-func (p *Mempool) Has(tx *genproto.Transaction) bool {
-	hash := hex.EncodeToString(types.CalculateTransactionHash(tx))
-	_, ok := p.txx[hash]
-	return ok
-}
-
-func (p *Mempool) Add(tx *genproto.Transaction) bool {
-	if p.Has(tx) {
-		return false
-	}
-
-	hash := hex.EncodeToString(types.CalculateTransactionHash(tx))
-	p.txx[hash] = tx
-	return true
+type NodeConfig struct {
+	Version    string
+	ListenAddr string
+	PrivateKey *cryptography.PrivateKey
 }
 
 type Node struct {
 	genproto.UnimplementedNodeServer
 
-	version    string
-	listenAddr string
-	log        *slog.Logger
+	NodeConfig
+	log *slog.Logger
 
 	peersLock sync.RWMutex
 	peers     map[string]ConnectedPeer
@@ -65,7 +46,7 @@ type ConnectedPeer struct {
 	nodeInfo   *genproto.NodeInfo
 }
 
-func NewNode(listenAddr string) *Node {
+func NewNode(config NodeConfig) *Node {
 	logHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level:     slog.LevelDebug,
 		AddSource: false,
@@ -78,10 +59,9 @@ func NewNode(listenAddr string) *Node {
 	})
 
 	return &Node{
+		NodeConfig: config,
+		log:        slog.New(logHandler).With("node", config.ListenAddr),
 		peers:      make(map[string]ConnectedPeer),
-		version:    nodeVersion,
-		listenAddr: listenAddr,
-		log:        slog.New(logHandler).With("node", listenAddr),
 		mempool:    NewMempool(),
 	}
 }
@@ -91,7 +71,7 @@ func NewNode(listenAddr string) *Node {
 // the specified list of bootstrap nodes.
 func (n *Node) Start(bootstrapNodes []string) error {
 	grpcServer := grpc.NewServer()
-	tpcListener, err := net.Listen("tcp", n.listenAddr)
+	tpcListener, err := net.Listen("tcp", n.ListenAddr)
 	if err != nil {
 		return err
 	}
@@ -102,26 +82,14 @@ func (n *Node) Start(bootstrapNodes []string) error {
 
 	if len(bootstrapNodes) > 0 {
 		n.log.Debug("need connect to", "peers", bootstrapNodes)
-		n.bootstrapNetwork(bootstrapNodes)
+		go n.bootstrapNetwork(bootstrapNodes)
+	}
+
+	if n.PrivateKey != nil {
+		go n.runValidatorLoop()
 	}
 
 	return grpcServer.Serve(tpcListener)
-}
-
-// bootstrapNetwork connects the current node to the specified list of listen socket addresses (ip:port).
-// It creates a new client connection to each peer node and performs a handshake to exchange node information.
-func (n *Node) bootstrapNetwork(listenSocketAddrs []string) error {
-	for _, listenSocketAddr := range listenSocketAddrs {
-		peerClient, peerNodeInfo, err := n.dialPeerNode(listenSocketAddr)
-		if err != nil {
-			n.log.Error("cannot dial to peer node", "error", err)
-			continue
-		}
-
-		n.addPeer(peerClient, peerNodeInfo)
-	}
-
-	return nil
 }
 
 //-----------------------------------------------------------------------------
@@ -175,6 +143,22 @@ func (n *Node) HandleTransaction(ctx context.Context, tx *genproto.Transaction) 
 //  Other methods
 //-----------------------------------------------------------------------------
 
+// bootstrapNetwork connects the current node to the specified list of listen socket addresses (ip:port).
+// It creates a new client connection to each peer node and performs a handshake to exchange node information.
+func (n *Node) bootstrapNetwork(listenSocketAddrs []string) error {
+	for _, listenSocketAddr := range listenSocketAddrs {
+		peerClient, peerNodeInfo, err := n.dialPeerNode(listenSocketAddr)
+		if err != nil {
+			n.log.Error("cannot dial to peer node", "error", err)
+			continue
+		}
+
+		n.addPeer(peerClient, peerNodeInfo)
+	}
+
+	return nil
+}
+
 func (n *Node) addPeer(peerClient genproto.NodeClient, peerNodeInfo *genproto.NodeInfo) {
 	n.peersLock.Lock()
 	n.peers[peerNodeInfo.ListenAddr] = ConnectedPeer{
@@ -201,6 +185,18 @@ func (n *Node) removePeer(peerListenAddr string) {
 
 	// TODO: close the peerClient
 	delete(n.peers, peerListenAddr)
+}
+
+func (n *Node) runValidatorLoop() {
+	ticker := time.NewTicker(blockTime)
+	n.log.Debug("running validation loop", "pubKey", n.PrivateKey.Public())
+
+	for {
+		<-ticker.C
+		txList := n.mempool.Clear()
+		n.mempool.ClearProcessed(time.Minute)
+		n.log.Info("new block imminent", "txs", len(txList))
+	}
 }
 
 // broadcast broadcasts message to all known peers
@@ -239,7 +235,7 @@ func (n *Node) getAbsentPeerList(peerAddrList []string) []string {
 	connectedPeers := n.getPeerList()
 
 	for _, peerAddr := range peerAddrList {
-		if peerAddr == n.listenAddr {
+		if peerAddr == n.ListenAddr {
 			// Skip own address
 			continue
 		}
@@ -262,9 +258,9 @@ func (n *Node) getAbsentPeerList(peerAddrList []string) []string {
 
 func (n *Node) getNodeInfo() *genproto.NodeInfo {
 	return &genproto.NodeInfo{
-		Version:    n.version,
+		Version:    n.Version,
 		Height:     0,
-		ListenAddr: n.listenAddr,
+		ListenAddr: n.ListenAddr,
 		PeerList:   n.getPeerList(),
 	}
 }

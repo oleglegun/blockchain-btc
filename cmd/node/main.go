@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const nodeCount = 4
+const nodeCount = 3
 
 func main() {
 	for i := 0; i < nodeCount; i++ {
@@ -24,21 +24,36 @@ func main() {
 		if i > 0 {
 			bootstrapNodes = append(bootstrapNodes, fmt.Sprintf("localhost:%d", port-1))
 		}
-
-		makeNode(listenAddr, bootstrapNodes)
+		if i == 0 {
+			makeNode(listenAddr, true, bootstrapNodes)
+		} else {
+			makeNode(listenAddr, false, bootstrapNodes)
+		}
 		time.Sleep(time.Second)
 	}
 
-	makeTransaction(":3000")
-	time.Sleep(10 * time.Second)
+	for {
+		go makeTransaction(":3001")
+		time.Sleep(time.Millisecond * 100)
+	}
 }
 
 /*-----------------------------------------------------------------------------
  *  Temp testing functions
  *----------------------------------------------------------------------------*/
 
-func makeNode(listenAddr string, bootstrapNodes []string) error {
-	nodeServer := node.NewNode(listenAddr)
+func makeNode(listenAddr string, isValidator bool, bootstrapNodes []string) error {
+	nodeConfig := node.NodeConfig{
+		Version:    "1",
+		ListenAddr: listenAddr,
+	}
+
+	if isValidator {
+		privKey := cryptography.GeneratePrivateKey()
+		nodeConfig.PrivateKey = &privKey
+	}
+
+	nodeServer := node.NewNode(nodeConfig)
 	go func() {
 		log.Fatal(nodeServer.Start(bootstrapNodes))
 	}()
@@ -46,13 +61,15 @@ func makeNode(listenAddr string, bootstrapNodes []string) error {
 	return nil
 }
 
+var clientConnCache = make(map[string]*grpc.ClientConn)
+
 func makeTransaction(addr string) {
-	clientConn, err := grpc.NewClient("dns:///localhost"+addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	clientConn, err := getClientConn(addr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer clientConn.Close()
+	// defer clientConn.Close()
 
 	sender1PrivKey := cryptography.GeneratePrivateKey()
 	sender2PrivKey := cryptography.GeneratePrivateKey()
@@ -91,6 +108,20 @@ func makeTransaction(addr string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func getClientConn(addr string) (*grpc.ClientConn, error) {
+	if conn, exists := clientConnCache[addr]; exists {
+		return conn, nil
+	}
+
+	conn, err := grpc.NewClient("dns:///localhost"+addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, err
+	}
+
+	clientConnCache[addr] = conn
+	return conn, nil
 }
 
 func makeHandshake(addr string) {
