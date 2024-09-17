@@ -30,9 +30,14 @@ func RandomBlock() *genproto.Block {
 	}
 
 	return &genproto.Block{
-		Header: blockHeader,
+		Header:    blockHeader,
 		PublicKey: Random32ByteHash(),
 		Signature: Random64ByteHash(),
+		Transactions: []*genproto.Transaction{
+			{
+				Version: 1,
+			},
+		},
 	}
 
 }

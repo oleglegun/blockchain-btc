@@ -115,12 +115,17 @@ func TestAddBlockWithTransactions(t *testing.T) {
 		Outputs: outputs,
 	}
 
+	
 	sig := types.CalculateTransactionSignature(senderPrivKey, tx)
-
+	
 	tx.Inputs[0].Signature = sig.Bytes()
-
+	
 	block.Transactions = append(block.Transactions, tx)
+	rootHash, err := types.CalculateRootHash(block)
+	require.Nil(t, err)
+	block.Header.RootHash = rootHash
 
+	types.SignBlock(senderPrivKey, block)
 	err = chain.AddBlock(block)
 	require.Nil(t, err)
 }

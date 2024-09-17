@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	"github.com/oleglegun/blockchain-btc/internal/cryptography"
+	"github.com/oleglegun/blockchain-btc/internal/genproto"
 	"github.com/oleglegun/blockchain-btc/internal/random"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHashBlock(t *testing.T) {
@@ -53,4 +55,39 @@ func TestVerifyBlock(t *testing.T) {
 
 	block.PublicKey = cryptography.NewPrivateKey().Public().Bytes()
 	assert.False(t, VerifyBlock(block))
+}
+
+func TestCalculateRootHash(t *testing.T) {
+	block := random.RandomBlock()
+	tx := &genproto.Transaction{
+		Version: 1,
+	}
+
+	block.Transactions = append(block.Transactions, tx)
+
+	initialRootHash := block.Header.RootHash
+
+	rootHash, err := CalculateRootHash(block)
+	assert.Nil(t, err)
+
+	require.NotEqual(t, initialRootHash, rootHash)
+
+}
+
+func TestVerifyRootHash(t *testing.T) {
+	privKey := cryptography.NewPrivateKey()
+
+	block := random.RandomBlock()
+	tx := &genproto.Transaction{
+		Version: 1,
+	}
+
+	block.Transactions = append(block.Transactions, tx)
+
+	_ = SignBlock(privKey, block)
+
+	assert.True(t, VerifyRootHash(block))
+
+	block.Header.RootHash = []byte("invalid")
+	assert.False(t, VerifyRootHash(block))
 }
