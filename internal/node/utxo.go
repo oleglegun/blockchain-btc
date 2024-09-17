@@ -13,10 +13,6 @@ type UTXO struct {
 func NewUTXO(hash string, outIndex int, amount int64) *UTXO {
 	isSpent := false
 
-	if amount <= 0 {
-		isSpent = true
-	}
-
 	return &UTXO{
 		Hash:     hash,
 		OutIndex: outIndex,

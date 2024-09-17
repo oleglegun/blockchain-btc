@@ -56,13 +56,27 @@ func (c *Chain) addBlock(block *genproto.Block) error {
 
 		hash := types.HashTransactionString(tx)
 
-		for idx, out := range tx.Outputs {
-			utxo := NewUTXO(hash, idx, out.Amount)
+		for idx, txOutput := range tx.Outputs {
+			utxo := NewUTXO(hash, idx, txOutput.Amount)
 
 			if err := c.utxoStore.Put(utxo); err != nil {
 				return fmt.Errorf("failed to put utxo into store: %w", err)
 			}
 		}
+
+		for _, txInput := range tx.Inputs {
+			key := getUTXOKey(hex.EncodeToString(txInput.PrevTxHash), int(txInput.PrevTxOutIndex))
+			utxo, err := c.utxoStore.Get(key)
+			if err != nil {
+				return fmt.Errorf("failed to get utxo: %w", err)
+			}
+			// Not double spending
+			utxo.IsSpent = true
+			if err := c.utxoStore.Put(utxo); err != nil {
+				return fmt.Errorf("failed to put spent utxo into store: %w", err)
+			}
+		}
+
 	}
 
 	return c.blockStore.Put(block)

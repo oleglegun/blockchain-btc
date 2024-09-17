@@ -38,6 +38,8 @@ type Node struct {
 	peersLock sync.RWMutex
 	peers     map[string]ConnectedPeer
 	mempool   *Mempool
+
+	chain *Chain
 }
 
 type ConnectedPeer struct {
@@ -45,7 +47,7 @@ type ConnectedPeer struct {
 	nodeInfo   *genproto.NodeInfo
 }
 
-func NewNode(config NodeConfig) *Node {
+func NewNode(config NodeConfig, chain *Chain) *Node {
 	logHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level:     slog.LevelDebug,
 		AddSource: false,
@@ -62,6 +64,7 @@ func NewNode(config NodeConfig) *Node {
 		log:        slog.New(logHandler).With("node", config.ListenAddr),
 		peers:      make(map[string]ConnectedPeer),
 		mempool:    NewMempool(),
+		chain:      chain,
 	}
 }
 
@@ -194,7 +197,13 @@ func (n *Node) runValidatorLoop() {
 		<-ticker.C
 		txList := n.mempool.Clear()
 		n.mempool.ClearProcessed(time.Minute)
-		n.log.Info("new block imminent", "txs", len(txList))
+		n.log.Info("creating new block", "txs", len(txList))
+
+		// Construct a new block
+		// Add transactions from the mempool to the block
+		// Sign the block with the private key
+		// Add the block to the chain
+		// Broadcast the block to all known peers
 	}
 }
 

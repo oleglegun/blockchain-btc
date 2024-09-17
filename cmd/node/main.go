@@ -34,7 +34,7 @@ func main() {
 
 	for {
 		go makeTransaction(":3001")
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 1000)
 	}
 }
 
@@ -53,7 +53,9 @@ func makeNode(listenAddr string, isValidator bool, bootstrapNodes []string) erro
 		nodeConfig.PrivateKey = &privKey
 	}
 
-	nodeServer := node.NewNode(nodeConfig)
+	chain := node.NewChain(node.NewMemoryBlockStore(), node.NewMemoryTxStore(), node.NewMemoryUTXOStore())
+
+	nodeServer := node.NewNode(nodeConfig, chain)
 	go func() {
 		log.Fatal(nodeServer.Start(bootstrapNodes))
 	}()
@@ -69,7 +71,7 @@ func makeTransaction(addr string) {
 		log.Fatal(err)
 	}
 
-	// defer clientConn.Close()
+	defer clientConn.Close()
 
 	sender1PrivKey := cryptography.NewPrivateKey()
 	sender2PrivKey := cryptography.NewPrivateKey()
