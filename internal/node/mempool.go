@@ -66,7 +66,7 @@ func (p *Mempool) ClearProcessed(threshold time.Duration) []string {
 // Has checks if the PROCESSED given transaction is present in the mempool.
 // It returns true if the transaction is present, false otherwise.
 func (p *Mempool) Has(tx *genproto.Transaction) bool {
-	hash := hex.EncodeToString(types.CalculateTransactionHash(tx))
+	hash := hex.EncodeToString(types.HashTransaction(tx))
 
 	p.RLock()
 	defer p.RUnlock()
@@ -76,7 +76,7 @@ func (p *Mempool) Has(tx *genproto.Transaction) bool {
 }
 
 func (p *Mempool) Add(tx *genproto.Transaction) bool {
-	hash := hex.EncodeToString(types.CalculateTransactionHash(tx))
+	hash := hex.EncodeToString(types.HashTransaction(tx))
 
 	p.Lock()
 	defer p.Unlock()

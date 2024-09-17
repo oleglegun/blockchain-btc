@@ -22,7 +22,7 @@ func TestNewChain(t *testing.T) {
 func TestAddBlock(t *testing.T) {
 	chain := NewChain(NewMemoryBlockStore())
 
-	privKey := cryptography.GeneratePrivateKey()
+	privKey := cryptography.NewPrivateKey()
 
 	for i := 1; i < 10; i++ {
 		block, err := createSignedBlock(chain, privKey)
@@ -46,7 +46,7 @@ func TestAddBlock(t *testing.T) {
 func TestChainHeight(t *testing.T) {
 	chain := NewChain(NewMemoryBlockStore())
 
-	privKey := cryptography.GeneratePrivateKey()
+	privKey := cryptography.NewPrivateKey()
 
 	for i := 1; i < 10; i++ {
 		block, err := createSignedBlock(chain, privKey)

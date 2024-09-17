@@ -16,7 +16,7 @@ const (
 	SigLen     = 64
 )
 
-func GeneratePrivateKey() PrivateKey {
+func NewPrivateKey() PrivateKey {
 	seed := make([]byte, SeedLen)
 	_, err := io.ReadFull(rand.Reader, seed)
 	if err != nil {
@@ -25,7 +25,15 @@ func GeneratePrivateKey() PrivateKey {
 	return PrivateKey{key: ed25519.NewKeyFromSeed(seed)}
 }
 
-func GeneratePrivateKeyFromSeed(seed []byte) PrivateKey {
+func NewPrivateKeyFromBytes(b []byte) PrivateKey {
+	if len(b) != PrivKeyLen {
+		log.Fatalf("private key length should be %d bytes", PrivKeyLen)
+	}
+
+	return PrivateKey{key: ed25519.PrivateKey(b)}
+}
+
+func NewPrivateKeyFromSeed(seed []byte) PrivateKey {
 	if len(seed) != SeedLen {
 		log.Fatalf("seed length should be %d bytes", SeedLen)
 	}
@@ -33,12 +41,18 @@ func GeneratePrivateKeyFromSeed(seed []byte) PrivateKey {
 	return PrivateKey{key: ed25519.NewKeyFromSeed(seed)}
 }
 
-func GeneratePrivateKeyFromString(str string) PrivateKey {
+// NewPrivateKeyFromString creates a new PrivateKey from a hexadecimal string representation of the private key seed.
+//
+// The input string must be exactly 64 hexadecimal characters (32 bytes) long, representing the 32-byte private key seed.
+// If the input string is not valid hex or the length is incorrect, the function will log a fatal error.
+//
+// This function is useful for deserializing a private key from a string representation, such as when reading from a configuration file or other storage.
+func NewPrivateKeyFromString(str string) PrivateKey {
 	seed, err := hex.DecodeString(str)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return GeneratePrivateKeyFromSeed(seed)
+	return NewPrivateKeyFromSeed(seed)
 }
 
 /*-----------------------------------------------------------------------------
@@ -101,14 +115,13 @@ func (p PublicKey) Address() Address {
  *  Signature
  *----------------------------------------------------------------------------*/
 
-// Change to pointer if needed (for len and cap)
 type Signature struct {
 	value []byte
 }
 
 func NewSignatureFromBytes(b []byte) Signature {
 	if len(b) != SigLen {
-		log.Fatal("signature length is incorrect")
+		log.Fatal("invalid signature length")
 	}
 	return Signature{
 		value: b,

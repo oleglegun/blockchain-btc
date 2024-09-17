@@ -49,7 +49,7 @@ func makeNode(listenAddr string, isValidator bool, bootstrapNodes []string) erro
 	}
 
 	if isValidator {
-		privKey := cryptography.GeneratePrivateKey()
+		privKey := cryptography.NewPrivateKey()
 		nodeConfig.PrivateKey = &privKey
 	}
 
@@ -71,9 +71,9 @@ func makeTransaction(addr string) {
 
 	// defer clientConn.Close()
 
-	sender1PrivKey := cryptography.GeneratePrivateKey()
-	sender2PrivKey := cryptography.GeneratePrivateKey()
-	receiverPrivKey := cryptography.GeneratePrivateKey()
+	sender1PrivKey := cryptography.NewPrivateKey()
+	sender2PrivKey := cryptography.NewPrivateKey()
+	receiverPrivKey := cryptography.NewPrivateKey()
 
 	txIn1 := &genproto.TxInput{
 		PrevTxHash:     random.Random32ByteHash(),

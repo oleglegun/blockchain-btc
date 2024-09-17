@@ -116,7 +116,7 @@ func (hs *BlockHeaderList) Height() int {
 }
 
 func createGenesisBlock() *genproto.Block {
-	privKey := cryptography.GeneratePrivateKey()
+	privKey := cryptography.NewPrivateKey()
 	block := &genproto.Block{
 		Header: &genproto.BlockHeader{
 			Version:   1,

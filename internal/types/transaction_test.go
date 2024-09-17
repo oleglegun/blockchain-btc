@@ -10,13 +10,13 @@ import (
 )
 
 func TestCalculateTransactionHash(t *testing.T) {
-	sender1PrivKey := cryptography.GeneratePrivateKey()
+	sender1PrivKey := cryptography.NewPrivateKey()
 	sender1Addr := sender1PrivKey.Public().Address().Bytes()
 
-	sender2PrivKey := cryptography.GeneratePrivateKey()
+	sender2PrivKey := cryptography.NewPrivateKey()
 	_ = sender2PrivKey.Public().Address().Bytes()
 
-	receiverPrivKey := cryptography.GeneratePrivateKey()
+	receiverPrivKey := cryptography.NewPrivateKey()
 	receiverAddr := receiverPrivKey.Public().Address().Bytes()
 
 	// Initial balance: 10

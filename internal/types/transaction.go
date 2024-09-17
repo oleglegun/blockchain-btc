@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func CalculateTransactionHash(tx *genproto.Transaction) []byte {
+func HashTransaction(tx *genproto.Transaction) []byte {
 	b, err := proto.Marshal(tx)
 	if err != nil {
 		panic(err)
@@ -19,7 +19,7 @@ func CalculateTransactionHash(tx *genproto.Transaction) []byte {
 }
 
 func CalculateTransactionSignature(privKey cryptography.PrivateKey, tx *genproto.Transaction) cryptography.Signature {
-	return privKey.Sign(CalculateTransactionHash(tx))
+	return privKey.Sign(HashTransaction(tx))
 }
 
 func VerifyTransaction(tx *genproto.Transaction) bool {
@@ -37,7 +37,7 @@ func VerifyTransaction(tx *genproto.Transaction) bool {
 		sig := cryptography.NewSignatureFromBytes(inputSignatures[idx])
 		pubKey := cryptography.NewPublicKeyFromBytes(input.PublicKey)
 
-		if !sig.Verify(pubKey, CalculateTransactionHash(tx)) {
+		if !sig.Verify(pubKey, HashTransaction(tx)) {
 			isValid = false
 			break
 		}

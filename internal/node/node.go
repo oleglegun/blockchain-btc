@@ -126,7 +126,7 @@ func (n *Node) HandleTransaction(ctx context.Context, tx *genproto.Transaction) 
 	}
 
 	if n.mempool.Add(tx) {
-		txHash := hex.EncodeToString(types.CalculateTransactionHash(tx))
+		txHash := hex.EncodeToString(types.HashTransaction(tx))
 		n.log.Debug("received tx", "from", peer.Addr, "tx", txHash)
 
 		go func() {
