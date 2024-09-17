@@ -257,7 +257,8 @@ type TxInput struct {
 	// prevTxOutIndex (UTXO id) is the index of the output in the previous transaction that this input is spending from.
 	PrevTxOutIndex uint32 `protobuf:"varint,2,opt,name=prevTxOutIndex,proto3" json:"prevTxOutIndex,omitempty"`
 	PublicKey      []byte `protobuf:"bytes,3,opt,name=publicKey,proto3" json:"publicKey,omitempty"`
-	Signature      []byte `protobuf:"bytes,4,opt,name=signature,proto3" json:"signature,omitempty"`
+	// signature signs the transaction hash and the public key of the sender.
+	Signature []byte `protobuf:"bytes,4,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 
 func (x *TxInput) Reset() {

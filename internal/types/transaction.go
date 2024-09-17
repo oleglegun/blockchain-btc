@@ -2,13 +2,14 @@ package types
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 
 	"github.com/oleglegun/blockchain-btc/internal/cryptography"
 	"github.com/oleglegun/blockchain-btc/internal/genproto"
 	"google.golang.org/protobuf/proto"
 )
 
-func HashTransaction(tx *genproto.Transaction) []byte {
+func HashTransactionBytes(tx *genproto.Transaction) []byte {
 	b, err := proto.Marshal(tx)
 	if err != nil {
 		panic(err)
@@ -18,10 +19,15 @@ func HashTransaction(tx *genproto.Transaction) []byte {
 	return hash[:]
 }
 
-func CalculateTransactionSignature(privKey cryptography.PrivateKey, tx *genproto.Transaction) cryptography.Signature {
-	return privKey.Sign(HashTransaction(tx))
+func HashTransactionString(tx *genproto.Transaction) string {
+	return hex.EncodeToString(HashTransactionBytes(tx))
 }
 
+func CalculateTransactionSignature(privKey cryptography.PrivateKey, tx *genproto.Transaction) cryptography.Signature {
+	return privKey.Sign(HashTransactionBytes(tx))
+}
+
+// VerifyTransaction verifies the transaction by checking the signature of each input.
 func VerifyTransaction(tx *genproto.Transaction) bool {
 	var isValid = true
 
@@ -29,6 +35,9 @@ func VerifyTransaction(tx *genproto.Transaction) bool {
 
 	// Remove signatures
 	for idx, input := range tx.Inputs {
+		if len(input.Signature) == 0 {
+			panic("tx signature is empty")
+		}
 		inputSignatures[idx] = input.Signature
 		input.Signature = nil
 	}
@@ -37,7 +46,7 @@ func VerifyTransaction(tx *genproto.Transaction) bool {
 		sig := cryptography.NewSignatureFromBytes(inputSignatures[idx])
 		pubKey := cryptography.NewPublicKeyFromBytes(input.PublicKey)
 
-		if !sig.Verify(pubKey, HashTransaction(tx)) {
+		if !sig.Verify(pubKey, HashTransactionBytes(tx)) {
 			isValid = false
 			break
 		}

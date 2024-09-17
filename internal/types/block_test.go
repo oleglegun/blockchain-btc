@@ -10,7 +10,7 @@ import (
 
 func TestHashBlock(t *testing.T) {
 	block := random.RandomBlock()
-	hash := HashBlock(block)
+	hash := HashBlockBytes(block)
 	assert.Equal(t, 32, len(hash))
 }
 
@@ -24,7 +24,7 @@ func TestSignBlock(t *testing.T) {
 	sig := SignBlock(privKey, block)
 
 	assert.Equal(t, 64, len(sig.Bytes()))
-	assert.True(t, sig.Verify(pubKey, HashBlock(block)))
+	assert.True(t, sig.Verify(pubKey, HashBlockBytes(block)))
 
 	assert.Equal(t, pubKey.Bytes(), block.PublicKey)
 	assert.Equal(t, sig.Bytes(), block.Signature)

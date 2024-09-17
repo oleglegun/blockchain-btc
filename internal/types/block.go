@@ -2,6 +2,7 @@ package types
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 
 	"github.com/oleglegun/blockchain-btc/internal/cryptography"
 	"github.com/oleglegun/blockchain-btc/internal/genproto"
@@ -19,19 +20,23 @@ func HashBlockHeader(header *genproto.BlockHeader) []byte {
 	return hash[:]
 }
 
-// HashBlock computes the hash of the given block's header.
+// HashBlockBytes computes the hash of the given block's header.
 // Block hash == its header hash
-func HashBlock(block *genproto.Block) []byte {
+func HashBlockBytes(block *genproto.Block) []byte {
 	return HashBlockHeader(block.Header)
+}
+
+func HashBlockString(block *genproto.Block) string {
+	return hex.EncodeToString(HashBlockBytes(block))
 }
 
 // SignBlock signs the given block using the provided private key.
 func SignBlock(privKey cryptography.PrivateKey, block *genproto.Block) cryptography.Signature {
-	hash := HashBlock(block)
+	hash := HashBlockBytes(block)
 	signature := privKey.Sign(hash)
 	block.PublicKey = privKey.Public().Bytes()
 	block.Signature = signature.Bytes()
-	return privKey.Sign(HashBlock(block))
+	return privKey.Sign(HashBlockBytes(block))
 }
 
 func VerifyBlock(block *genproto.Block) bool {
@@ -42,7 +47,7 @@ func VerifyBlock(block *genproto.Block) bool {
 		return false
 	}
 
-	hash := HashBlock(block)
+	hash := HashBlockBytes(block)
 	pubKey := cryptography.NewPublicKeyFromBytes(block.PublicKey)
 	signature := cryptography.NewSignatureFromBytes(block.Signature)
 

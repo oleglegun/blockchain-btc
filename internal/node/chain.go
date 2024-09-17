@@ -11,13 +11,24 @@ import (
 	"github.com/oleglegun/blockchain-btc/internal/types"
 )
 
+const (
+	genesisBlockSeed    = "b69d0c49b336d58aca501f6a0ba60c933b5904bea73a6c288639b9c3c830627f"
+	genesisBlockVersion = 1
+	genesisBlockHeight  = 0
+	genesisBlockAmount  = 1e6
+)
+
 type Chain struct {
-	blockStore   BlockStorer
+	txStore      TxStore
+	blockStore   BlockStore
+	utxoStore    UTXOStore
 	blockHeaders *BlockHeaderList
 }
 
-func NewChain(bs BlockStorer) *Chain {
+func NewChain(bs BlockStore, txs TxStore, utxos UTXOStore) *Chain {
 	chain := &Chain{
+		txStore:      txs,
+		utxoStore:    utxos,
 		blockStore:   bs,
 		blockHeaders: NewBlockHeaderList(),
 	}
@@ -37,12 +48,29 @@ func (c *Chain) AddBlock(block *genproto.Block) error {
 // We cannot validate the genesis block, that is why AddBlock is split in 2 funcs.
 func (c *Chain) addBlock(block *genproto.Block) error {
 	c.blockHeaders.Add(block.Header)
+
+	for _, tx := range block.Transactions {
+		if err := c.txStore.Put(tx); err != nil {
+			return fmt.Errorf("failed to put transaction into store: %w", err)
+		}
+
+		hash := types.HashTransactionString(tx)
+
+		for idx, out := range tx.Outputs {
+			utxo := NewUTXO(hash, idx, out.Amount)
+
+			if err := c.utxoStore.Put(utxo); err != nil {
+				return fmt.Errorf("failed to put utxo into store: %w", err)
+			}
+		}
+	}
+
 	return c.blockStore.Put(block)
 }
 
 func (c *Chain) ValidateBlock(block *genproto.Block) error {
 	if !types.VerifyBlock(block) {
-		return fmt.Errorf("block with hash %s has an invalid signature", hex.EncodeToString(types.HashBlock(block)))
+		return fmt.Errorf("block with hash %s has an invalid signature", types.HashBlockString(block))
 	}
 
 	currentBlock, err := c.GetBlockByHeight(c.Height())
@@ -50,15 +78,74 @@ func (c *Chain) ValidateBlock(block *genproto.Block) error {
 		return err
 	}
 
-	currentHash := types.HashBlock(currentBlock)
-
-	nextHash := hex.EncodeToString(types.HashBlock(block))
+	currentHash := types.HashBlockBytes(currentBlock)
 
 	if !bytes.Equal(block.Header.PrevHash, currentHash) {
-		return fmt.Errorf("block with hash %s is not a successor of the current block", nextHash)
+		return fmt.Errorf("block with hash %s is not a successor of the current block", types.HashBlockString(block))
+	}
+
+	for _, tx := range block.Transactions {
+		if err := c.ValidateTransaction(tx); err != nil {
+			return fmt.Errorf("failed to validate transaction: %w", err)
+		}
 	}
 
 	return nil
+}
+
+func (c *Chain) ValidateTransaction(tx *genproto.Transaction) error {
+	if !types.VerifyTransaction(tx) {
+		return fmt.Errorf("transaction with hash %s is invalid", types.HashTransactionString(tx))
+	}
+
+	inputSum, err := c.sumTotalInputAmount(tx)
+	if err != nil {
+		return fmt.Errorf("failed to sum total input amount: %w", err)
+	}
+
+	outputSum, err := c.sumTotalOutputAmount(tx)
+	if err != nil {
+		return fmt.Errorf("failed to sum total output amount: %w", err)
+	}
+
+	if inputSum < outputSum {
+		return fmt.Errorf("transaction with hash %s has insufficient funds", types.HashTransactionString(tx))
+	}
+
+	return nil
+}
+
+func (c *Chain) sumTotalInputAmount(tx *genproto.Transaction) (int64, error) {
+	var sumInputs int64
+
+	for _, input := range tx.Inputs {
+		key := fmt.Sprintf("%s:%d", hex.EncodeToString(input.PrevTxHash), input.PrevTxOutIndex)
+		utxo, err := c.utxoStore.Get(key)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get utxo %s: %w", key, err)
+		}
+
+		if utxo.IsSpent {
+			return 0, fmt.Errorf("utxo %s is already spent", key)
+		}
+
+		sumInputs += utxo.Amount
+	}
+
+	return sumInputs, nil
+}
+
+func (c *Chain) sumTotalOutputAmount(tx *genproto.Transaction) (int64, error) {
+	var sumOutputs int64
+	for _, output := range tx.Outputs {
+		if output.Amount < 0 {
+			return 0, fmt.Errorf("transaction with hash %s has negative output amount", types.HashTransactionString(tx))
+		}
+
+		sumOutputs += output.Amount
+	}
+
+	return sumOutputs, nil
 }
 
 func (c *Chain) GetBlockByHash(hash []byte) (*genproto.Block, error) {
@@ -116,14 +203,27 @@ func (hs *BlockHeaderList) Height() int {
 }
 
 func createGenesisBlock() *genproto.Block {
-	privKey := cryptography.NewPrivateKey()
+	privKey := cryptography.NewPrivateKeyFromString(genesisBlockSeed)
 	block := &genproto.Block{
 		Header: &genproto.BlockHeader{
-			Version:   1,
-			Height:    0,
+			Version:   genesisBlockVersion,
+			Height:    genesisBlockHeight,
 			Timestamp: time.Now().Unix(),
 		},
 	}
+
+	tx := &genproto.Transaction{
+		Version: genesisBlockVersion,
+		Inputs:  []*genproto.TxInput{},
+		Outputs: []*genproto.TxOutput{
+			{
+				Amount:  genesisBlockAmount,
+				Address: privKey.Public().Address().Bytes(),
+			},
+		},
+	}
+
+	block.Transactions = append(block.Transactions, tx)
 
 	types.SignBlock(privKey, block)
 

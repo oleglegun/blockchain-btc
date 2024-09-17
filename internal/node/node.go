@@ -2,7 +2,6 @@ package node
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"net"
@@ -126,7 +125,7 @@ func (n *Node) HandleTransaction(ctx context.Context, tx *genproto.Transaction) 
 	}
 
 	if n.mempool.Add(tx) {
-		txHash := hex.EncodeToString(types.HashTransaction(tx))
+		txHash := types.HashTransactionString(tx)
 		n.log.Debug("received tx", "from", peer.Addr, "tx", txHash)
 
 		go func() {
