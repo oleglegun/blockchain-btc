@@ -51,12 +51,6 @@ func NewNode(config NodeConfig, chain *Chain) *Node {
 	logHandler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level:     slog.LevelDebug,
 		AddSource: false,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.TimeKey {
-				return slog.Attr{}
-			}
-			return a
-		},
 	})
 
 	return &Node{
@@ -83,7 +77,7 @@ func (n *Node) Start(bootstrapNodes []string) error {
 	n.log.Debug("running...")
 
 	if len(bootstrapNodes) > 0 {
-		n.log.Debug("need connect to", "peers", bootstrapNodes)
+		n.log.Debug("discovered new peers", "peers", bootstrapNodes)
 		go n.bootstrapNetwork(bootstrapNodes)
 	}
 
@@ -176,7 +170,7 @@ func (n *Node) addPeer(peerClient genproto.NodeClient, peerNodeInfo *genproto.No
 	absentPeerList := n.getAbsentPeerList(peerNodeInfo.PeerList)
 
 	if len(absentPeerList) > 0 {
-		n.log.Debug("need connect to", "peers", absentPeerList)
+		n.log.Debug("discovered new peers", "peers", absentPeerList)
 		go n.bootstrapNetwork(absentPeerList)
 	}
 }
@@ -191,13 +185,13 @@ func (n *Node) removePeer(peerListenAddr string) {
 
 func (n *Node) runValidatorLoop() {
 	ticker := time.NewTicker(blockTime)
-	n.log.Debug("running validation loop", "pubKey", n.PrivateKey.Public())
+	n.log.Debug("running validation loop", "pubKey", n.PrivateKey.Public().String())
 
 	for {
 		<-ticker.C
 		txList := n.mempool.Clear()
 		n.mempool.ClearProcessed(time.Minute)
-		n.log.Info("creating new block", "txs", len(txList))
+		n.log.Debug("creating new block", "txs", len(txList))
 
 		// Construct a new block
 		// Add transactions from the mempool to the block

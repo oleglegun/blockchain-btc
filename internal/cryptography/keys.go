@@ -103,6 +103,10 @@ func (p PublicKey) Bytes() []byte {
 	return p.key
 }
 
+func (p PublicKey) String() string {
+	return hex.EncodeToString(p.key)
+}
+
 func (p PublicKey) Address() Address {
 	return Address{
 		// Return the last 20 bytes of the public key.
